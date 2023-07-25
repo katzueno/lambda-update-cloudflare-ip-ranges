@@ -1,45 +1,92 @@
 import boto3
+import requests
 import json
-import urllib.request
 import logging
 
-# BASIC CONFIG
-URL = 'https://api.cloudflare.com/client/v4/ips'
+# ToBeAdded
+# SNS_TOPIC_ARN = 'arn:aws:sns:<region_name>:<account_id>:<topic_name>'
+
 # BASE_REGION = 'prefix_list_region'
 BASE_REGION = 'us-east-1'
-# PREFIX_NAME = 'prefix_name'
-PREFIX_NAME = 'pl-0d32cc0ea748f6950'
+# PREFIX_ID = 'prefix_name'
+PREFIX_ID = 'pl-xxxxxxxxxxx'
+
+CloudflareIps = 'https://api.cloudflare.com/client/v4/ips'
+ec2 = boto3.client('ec2', region_name=BASE_REGION)
+sns = boto3.client('sns', region_name=BASE_REGION)
 
 # Set up logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-ec2 = boto3.client('ec2', region_name=BASE_REGION)
+def update_ips(cidrs_to_add, cidrs_to_delete, version):
+    # Update the prefix list
+    add_entries_list = []
+    del_entries_list = []
+
+    try:
+        if cidrs_to_delete:
+            for del_item in cidrs_to_delete:
+                del_entry_dist = {
+                    "Cidr":del_item
+                }
+                del_entries_list.append(del_entry_dist)
+        if cidrs_to_add:
+            for add_item in cidrs_to_add:
+                add_entry_dist = {
+                    "Cidr":add_item,
+                    "Description":"Cloudflare IPs"
+                }
+                add_entries_list.append(add_entry_dist)
+
+        ec2.modify_managed_prefix_list(
+            PrefixListId=PREFIX_ID,
+            AddEntries = add_entries_list,
+            RemoveEntries = del_entries_list,
+            CurrentVersion = version
+        )
+    except Exception as e:
+        # Log the error
+        logger.error(f'An error occurred: {e}')
+        return {
+            'statusCode': 500,
+            'body': json.dumps('An error occurred, while changing prefix list, please check the logs for more details.')
+        }
+    return
 
 def lambda_handler(event, context):
     try:
-
-        ## Get IPs From Managed Prefix List
+        ## Get current version of Prefix List 
         try:
-            ec2client = boto3.client('ec2')
-            prefix_list = ec2client.get_managed_prefix_list_entries(
-                PrefixListId=PREFIX_NAME,
+            prefix_list_version = ec2.describe_managed_prefix_lists(
+                PrefixListIds=[
+                    PREFIX_ID,
+                ]
             )
         except Exception as e:
             print(e)
             exit(1)
 
+        current_version = prefix_list_version["PrefixLists"][0]["Version"]
+        print(current_version)
+
+        ## Get IPs From Managed Prefix List
+        try:
+            prefix_list =  ec2.get_managed_prefix_list_entries(
+                PrefixListId=PREFIX_ID
+            )
+        except Exception as e:
+            print(e)
+            exit(1)
+
+        existing_ipv4_cidrs = set(entry['Cidr'] for entry in prefix_list["Entries"])
+
         # Fetch JSON data from URL
-        # response = requests.get('https://api.cloudflare.com/client/v4/ips')
-        req = urllib.request.Request(URL)
-        with urllib.request.urlopen(req) as res:
-        jsondata = json.load(res)
+        response = requests.get(CloudflareIps)
+        data = response.json()
 
         # Extract new IPv4 CIDRs
-        new_ipv4_cidrs = set(jsondata['result']['ipv4_cidrs'])
-
-        # Extract existing IPv4 CIDRs
-        existing_ipv4_cidrs = set(entry['Cidr'] for entry in prefix_list.entries)
+        new_ipv4_cidrs = set(data['result']['ipv4_cidrs'])
 
         # Find CIDRs to add and delete
         cidrs_to_add = list(new_ipv4_cidrs - existing_ipv4_cidrs)
@@ -49,27 +96,8 @@ def lambda_handler(event, context):
         logger.info(f'CIDRs to add: {cidrs_to_add}')
         logger.info(f'CIDRs to delete: {cidrs_to_delete}')
 
-        # Update the prefix list
-        for i in range(0, len(cidrs_to_add), 100):
-            prefix_list.modify(
-                AddEntries=[
-                    {
-                        'Cidr': cidr,
-                        'Description': 'Updated CIDR'
-                    }
-                    for cidr in cidrs_to_add[i:i+100]
-                ]
-            )
-
-        for i in range(0, len(cidrs_to_delete), 100):
-            prefix_list.modify(
-                RemoveEntries=[
-                    {
-                        'Cidr': cidr
-                    }
-                    for cidr in cidrs_to_delete[i:i+100]
-                ]
-            )
+        if cidrs_to_add or cidrs_to_delete:
+            update_ips(cidrs_to_add, cidrs_to_delete, current_version)
 
         return {
             'statusCode': 200,

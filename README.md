@@ -1,39 +1,30 @@
-## Automatically update AWS resources with Cloudflare IP Ranges
+# Lambda: Automatically update AWS resources with Cloudflare IP Ranges
 
-This project creates Lambda function that automatically create or update AWS resource with Cloudflare service's IP ranges from the [ip-ranges.json](https://www.cloudflare.com/en-gb/ips/) file, then update your custom VPC prefix list.
-
-The resources are created or updated in the region where the CloudFormation stack is created.
-
-
-> **NOTE**  
-> The idea was taken from the repository below which originally set AWS IP ranges. But made it very simple
-> https://github.com/aws-samples/update-cloudflare-ip-ranges
+This project creates Lambda function that automatically create or update AWS resource with Cloudflare service's IP v4 ranges from the [ip-ranges.json](https://www.cloudflare.com/en-gb/ips/) file, then update your custom VPC prefix list.
 
 
 ## Overview
 
-The CloudFormation template `cloudformation/template.yml` creates a stack with the following resources:
+1. EventBridge to execute an Lambda function daily
+2. Lambda function to fetch Cloudflare IPs from API and update the managed prefix list.
 
-1. AWS Lambda function with customizable config file called `services.json`. The function's code is in `lambda/update_cloudflare_ip_ranges.py` and is written in Python compatible with version 3.9.
-1. Lambda function's execution role.
-1. SNS subscription and Lambda invocation permissions for the `arn:aws:sns:us-east-1:806199016981:AmazonIpSpaceChanged` SNS topic.
 
 ```
-                          +-----------------+ 
-                          | Lambda          | 
-                          | Execution Role  | 
-                          +--------+--------+ 
+                             +-----------------+ 
+                             | Lambda          | 
+                             | Execution Role  | 
+                             +--------+--------+ 
                                    |          
-(WIP)                              |                  +-------------------+
-+--------------------+    +--------+--------+         |                   |
-|SNS Topic           +--->+ Lambda function +----+--->+AWS VPC Prefix List|
-|AmazonIpSpaceChanged|    +--------+--------+         |                   |
-+--------------------+             |                  +-------------------+
-                                   |             
-                        (WIP)      v             
-                          +--------+--------+ 
-                          | CloudWatch Logs |
-                          +-----------------+
+                                   |                     +-------------------+
++-----------------------+    +--------+--------+         |                   |
+|EventBridge            +--->+ Lambda function +----+--->+AWS VPC Prefix List|
+|e.g.,cron(0 0 * * ? *) |    +--------+--------+         |                   |
++-----------------------+             |                  +-------------------+
+                                      |             
+                           (WIP)      v             
+                             +--------+--------+ 
+                             | CloudWatch Logs |
+                             +-----------------+
 ```
 
 ## Supported resources
@@ -41,93 +32,102 @@ The CloudFormation template `cloudformation/template.yml` creates a stack with t
 It supports to create or update the following resource:
 * VPC Prefix List
 
+## TBA
 
+- Cloudformation or CDK
 
+We welcome your PR.
 
 ## Setup
 
 These are the overall steps to deploy:
 
-**Setup using CloudFormation**
-1. Validate CloudFormation template file.
-1. Create the CloudFormation stack.
-1. Package the Lambda code into a `.zip` file.
-1. Update Lambda function with the packaged code.
+### 1. Create a Lambda executable IAM role
 
-**Setup using Terraform**
-1. Initialize Terraform state
-1. Validate Terraform template.
-1. Apply Terraform template.
+- Create the following IAM Role for Lambda.
+  - e.g.) `lambda-update-cloudflare-managedprefixlist`
+- Remember the name of IAM role
 
-**After setup**
-1. Trigger a test Lambda invocation.
-1. Reference resources
-1. Clean-up
+(Please confirm and correct me!)
 
+ToDo: changing it more strict only to allow modifying to the specific prefix (PR is welcome!)
 
-## After setup
-
-### 1a. Trigger a test Lambda invocation with the AWS CLI
-
-After the stack is created, AWS resources are not created or updated until a new SNS message is received. To test the function and create or update AWS resources with the current IP ranges for the first time, do a test invocation with the AWS CLI command below:
-
-**CloudFormation**
-```bash
-aws lambda invoke \
-  --function-name "${FUNCTION_NAME}" \
-  --cli-binary-format 'raw-in-base64-out' \
-  --payload file://lambda/test_event.json lambda_return.json
 ```
-
-**Terraform**
-```bash
-FUNCTION_NAME=$(terraform output | grep 'lambda_name' | cut -d ' ' -f 3 | tr -d '"')
-aws lambda invoke \
-  --function-name "${FUNCTION_NAME}" \
-  --cli-binary-format 'raw-in-base64-out' \
-  --payload file://lambda/test_event.json lambda_return.json
-```
-
-After successful invocation, you should receive the response below with no errors.
-
-```json
 {
-    "StatusCode": 200,
-    "ExecutedVersion": "$LATEST"
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": [
+                "ec2:DescribeTags",
+                "ec2:DescribeManagedPrefixLists"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        },
+        {
+            "Action": [
+                "ec2:GetManagedPrefixListEntries",
+                "ec2:ModifyManagedPrefixList",
+                "ec2:CreateTags"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+        }
+    ]
 }
 ```
 
-### 1b. Trigger a test Lambda invocation with the AWS Console
+### 2. Create an empty managed prefix list 
 
-Alternatively, you can invoke the test event in the AWS Lambda console with sample event below. This event uses a `test-hash` md5 string that the function parses as a test event.
+- Create an empty managed VPC prefix list in your desired region
+    - Predfix list name: e.g..) `cloudflare-ips`
+    - Max entries: As of July 2023, Cloudflare has 15 IP range items. Set to 100 if possible, otherwise set it 30.
+- Copy and memo the prefix list ID (e.g., `pl-XXXXXXXXXXXXXXXXXXX`)
 
-```json
-{
-  "Records": [
-    {
-      "EventVersion": "1.0",
-      "EventSubscriptionArn": "arn:aws:sns:EXAMPLE",
-      "EventSource": "aws:sns",
-      "Sns": {
-        "SignatureVersion": "1",
-        "Timestamp": "1970-01-01T00:00:00.000Z",
-        "Signature": "EXAMPLE",
-        "SigningCertUrl": "EXAMPLE",
-        "MessageId": "12345678-1234-1234-1234-123456789012",
-        "Message": "{\"create-time\": \"yyyy-mm-ddThh:mm:ss+00:00\", \"synctoken\": \"0123456789\", \"md5\": \"test-hash\", \"url\": \"https://api.cloudflare.com/client/v4/ips\"}",
-        "Type": "Notification",
-        "UnsubscribeUrl": "EXAMPLE",
-        "TopicArn": "arn:aws:sns:EXAMPLE",
-        "Subject": "TestInvoke"
-      }
-    }
-  ]
-}
-```
+### 3. Create an lambda function
 
-### 2. Reference resources
+Create a Lambda funciton
 
-For VPC Prefix List, see [Reference prefix lists in your AWS resources](https://docs.aws.amazon.com/vpc/latest/userguide/managed-prefix-lists-referencing.html).
+- Function Name: anything (e.g., `UpdateCloudflarePrefixListIps`)
+- Runtime: `Python 3.10`
+- Architecture: either x86_64 or arm64 (I've tested with x86_64)
+- Permmission: `Use an existing role` and select what you previously made
+
+You don't need to turn on any additional `Advanced settings`
+
+### 4. Change the python code & modify it to your environment
+
+- Download the copy of `lambda/update_cloudflare_ip_ranges.py`
+- Change `BASE_REGION` to your region
+- Change `PREFIX_ID` to your prefix ID
+
+### 5. Upload the code to Lambda and test
+
+- Copy and paste via Lambda dashboard or create a zip file to upload to Lambda
+- Test run the code to check if the list is updated
+
+### 6. Add a trigger
+
+- Go back to your lambda function
+- In Function overview, click `Add trigger`
+- Select `EventBridge (CloudWatch Events)`
+- For Rule, select `Create a new rule`
+- Name `Rule name` accordingly (e.g., `daily-lambda-update-clouflare-ip`)
+- Add `Description` accordingly (e.g., `Run Cloudflare IP managed prefix list update daily`)
+- For Rule type, select `Scehdule expression`
+- Set the schedule accordingly
+    - To run at every day at 0am (UTC): `cron(0 0 * * ? *)`
+    - Cloudflare rarely update their IPv4 range. So I would say to update daily.
+    - If you experience error, Cloudflare may update IP range a lot, if so, you must run Lambda immediately
+
+### 7. Assign the managed prefix list to your ALB or EC2
+
+- Assign the managed prefix list to your EC2 or ALB  80 and 443 HTTP(S) ports security groups.
+- Make sure that you are not seeing any error message
+
+
+Done!
+
 
 ## Troubleshooting
 
@@ -138,3 +138,20 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
+
+# Credit
+
+GitHub @katzueno
+Macareux Digital, Inc.
+
+# Release History
+
+## July 25, 2023: v0.9.0
+
+- Initial release of working copy but not fully tested
+
+# Special Thanks
+
+- [Reference prefix lists in your AWS resources](https://docs.aws.amazon.com/vpc/latest/userguide/managed-prefix-lists-referencing.html).
+- [AWS管理のIPが更新された時にプレフィックスリストに登録しいているIPレンジを自動更新する](https://zenn.dev/nnydtmg/articles/aws-managed-prefixlist-update-lambda)
+    - GitHub [@nnydtmg / aws-prefixlist-update-lambda](https://github.com/nnydtmg/aws-prefixlist-update-lambda)

@@ -8,7 +8,7 @@ import logging
 
 # BASE_REGION = 'prefix_list_region'
 BASE_REGION = 'us-east-1'
-# PREFIX_ID = 'prefix_name'
+# PREFIX_ID = 'prefix_ID'
 PREFIX_ID = 'pl-xxxxxxxxxxx'
 
 CloudflareIps = 'https://api.cloudflare.com/client/v4/ips'
@@ -55,32 +55,32 @@ def update_ips(cidrs_to_add, cidrs_to_delete, version):
     return
 
 def lambda_handler(event, context):
+    ## Get current version of Prefix List 
     try:
-        ## Get current version of Prefix List 
-        try:
-            prefix_list_version = ec2.describe_managed_prefix_lists(
-                PrefixListIds=[
-                    PREFIX_ID,
-                ]
-            )
-        except Exception as e:
-            print(e)
-            exit(1)
+        prefix_list_version = ec2.describe_managed_prefix_lists(
+            PrefixListIds=[
+                PREFIX_ID,
+            ]
+        )
+    except Exception as e:
+        print(e)
+        exit(1)
 
-        current_version = prefix_list_version["PrefixLists"][0]["Version"]
-        logger.info(f'Current Version: {current_version}')
+    current_version = prefix_list_version["PrefixLists"][0]["Version"]
+    logger.info(f'Current Version: {current_version}')
 
-        ## Get IPs From Managed Prefix List
-        try:
-            prefix_list =  ec2.get_managed_prefix_list_entries(
-                PrefixListId=PREFIX_ID
-            )
-        except Exception as e:
-            print(e)
-            exit(1)
-
+    ## Get IPs From Managed Prefix List
+    try:
+        prefix_list =  ec2.get_managed_prefix_list_entries(
+            PrefixListId=PREFIX_ID
+        )
         existing_ipv4_cidrs = set(entry['Cidr'] for entry in prefix_list["Entries"])
-
+    except Exception as e:
+        logger.error(f'An error occurred while getting current prefix list: {e}')
+        exit(1)
+ 
+    ## Get Cloudflare IPs
+    try:
         # Fetch JSON data from URL
         webURL = urllib.request.urlopen(CloudflareIps)
         rawdata = webURL.read()
@@ -89,7 +89,10 @@ def lambda_handler(event, context):
 
         # Extract new IPv4 CIDRs
         new_ipv4_cidrs = set(new_cloudflareips['result']['ipv4_cidrs'])
-
+    except Exception as e:
+        logger.error(f'An error occurred while getting Cloudflare IPs: {e}')
+        exit(1)
+    try:
         # Find CIDRs to add and delete
         cidrs_to_add = list(new_ipv4_cidrs - existing_ipv4_cidrs)
         cidrs_to_delete = list(existing_ipv4_cidrs - new_ipv4_cidrs)
@@ -100,7 +103,7 @@ def lambda_handler(event, context):
 
         if cidrs_to_add or cidrs_to_delete:
             update_ips(cidrs_to_add, cidrs_to_delete, current_version)
-        else
+        else:
             logger.info(f'Nothing to change. Skipping')
 
         return {
@@ -110,7 +113,7 @@ def lambda_handler(event, context):
 
     except Exception as e:
         # Log the error
-        logger.error(f'An error occurred: {e}')
+        logger.error(f'An error occurred while updating prefix list: {e}')
         return {
             'statusCode': 500,
             'body': json.dumps('An error occurred, please check the logs for more details.')

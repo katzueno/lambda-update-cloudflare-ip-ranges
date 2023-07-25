@@ -1,5 +1,5 @@
 import boto3
-import requests
+import urllib.request
 import json
 import logging
 
@@ -68,7 +68,7 @@ def lambda_handler(event, context):
             exit(1)
 
         current_version = prefix_list_version["PrefixLists"][0]["Version"]
-        print(current_version)
+        logger.info(f'Current Version: {current_version}')
 
         ## Get IPs From Managed Prefix List
         try:
@@ -82,11 +82,13 @@ def lambda_handler(event, context):
         existing_ipv4_cidrs = set(entry['Cidr'] for entry in prefix_list["Entries"])
 
         # Fetch JSON data from URL
-        response = requests.get(CloudflareIps)
-        data = response.json()
+        webURL = urllib.request.urlopen(CloudflareIps)
+        rawdata = webURL.read()
+        encoding = webURL.info().get_content_charset('utf-8')
+        new_cloudflareips = json.loads(rawdata.decode(encoding))
 
         # Extract new IPv4 CIDRs
-        new_ipv4_cidrs = set(data['result']['ipv4_cidrs'])
+        new_ipv4_cidrs = set(new_cloudflareips['result']['ipv4_cidrs'])
 
         # Find CIDRs to add and delete
         cidrs_to_add = list(new_ipv4_cidrs - existing_ipv4_cidrs)
@@ -98,6 +100,8 @@ def lambda_handler(event, context):
 
         if cidrs_to_add or cidrs_to_delete:
             update_ips(cidrs_to_add, cidrs_to_delete, current_version)
+        else
+            logger.info(f'Nothing to change. Skipping')
 
         return {
             'statusCode': 200,

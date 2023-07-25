@@ -19,8 +19,8 @@ import boto3  # type: ignore
 ####
 
 DESCRIPTION = 'Managed by update IP ranges Lambda'
-RESOURCE_NAME_PREFIX = 'aws-ip-ranges'
-MANAGED_BY = 'update-aws-ip-ranges'
+RESOURCE_NAME_PREFIX = 'cloudflare-ip-ranges'
+MANAGED_BY = 'update-cloudflare-ip-ranges'
 
 ####### Get values from environment variables  ######
 
@@ -156,10 +156,9 @@ def get_ip_groups_json(url: str, expected_hash: str) -> str:
     return ip_json
 
 def get_ranges_for_service(ranges: dict, config_services: dict) -> dict[str, ServiceIPRange]:
-    """Gets IPv4 and IPv6 prefixes from the matching services"""
+    """Gets IPv4 and IPv6 prefixes"""
     logging.info('get_ranges_for_service start')
     logging.debug(f'Parameter ranges: {ranges}')
-    logging.debug(f'Parameter config_services: {config_services}')
 
     service_ranges: dict[str, ServiceIPRange] = {}
     service_control: dict[str, bool] = {}
@@ -707,6 +706,7 @@ def lambda_handler(event, context):
     logging.debug(f'Parameter context: {context}')
     try:
         # Read config file to get services and regions
+        # ToDo: To be deleted
         with open('services.json', 'r', encoding='utf-8') as services_file:
             logging.info('Reading file "services.json"')
             config_services: dict[str, Any] = json.loads(services_file.read())

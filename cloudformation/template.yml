@@ -26,7 +26,7 @@ Resources:
       Environment: 
         Variables:
           LOG_LEVEL: 'INFO'
-      Handler: 'update_aws_ip_ranges.lambda_handler'
+      Handler: 'update_cloudflare_ip_ranges.lambda_handler'
       MemorySize: 256
       Role: !GetAtt 'LambdaUpdateIPRangesIamRole.Arn'
       Runtime: python3.10
@@ -88,10 +88,10 @@ Resources:
                 Condition:
                   StringLike:
                     'aws:RequestTag/Name':
-                      - 'aws-ip-ranges-*-ipv4'
-                      - 'aws-ip-ranges-*-ipv6'
+                      - 'cloudflare-ip-ranges-*-ipv4'
+                      - 'cloudflare-ip-ranges-*-ipv6'
                   StringEquals:
-                    'aws:RequestTag/ManagedBy': 'update-aws-ip-ranges'
+                    'aws:RequestTag/ManagedBy': 'update-cloudflare-ip-ranges'
                     'aws:RequestTag/UpdatedAt': 'Not yet'
                   'ForAllValues:StringEquals':
                     'aws:TagKeys':
@@ -104,15 +104,15 @@ Resources:
                 Action:
                   - 'wafv2:TagResource'
                 Resource:
-                  - !Sub 'arn:${AWS::Partition}:wafv2:${AWS::Region}:${AWS::AccountId}:*/ipset/aws-ip-ranges-*-ipv4/*'
-                  - !Sub 'arn:${AWS::Partition}:wafv2:${AWS::Region}:${AWS::AccountId}:*/ipset/aws-ip-ranges-*-ipv6/*'
+                  - !Sub 'arn:${AWS::Partition}:wafv2:${AWS::Region}:${AWS::AccountId}:*/ipset/cloudflare-ip-ranges-*-ipv4/*'
+                  - !Sub 'arn:${AWS::Partition}:wafv2:${AWS::Region}:${AWS::AccountId}:*/ipset/cloudflare-ip-ranges-*-ipv6/*'
                 Condition:
                   StringLike:
                     'aws:ResourceTag/Name':
-                      - 'aws-ip-ranges-*-ipv4'
-                      - 'aws-ip-ranges-*-ipv6'
+                      - 'cloudflare-ip-ranges-*-ipv4'
+                      - 'cloudflare-ip-ranges-*-ipv6'
                   StringEquals:
-                    'aws:ResourceTag/ManagedBy': 'update-aws-ip-ranges'
+                    'aws:ResourceTag/ManagedBy': 'update-cloudflare-ip-ranges'
                   'ForAllValues:StringEquals':
                     'aws:TagKeys':
                       - 'UpdatedAt'
@@ -123,15 +123,15 @@ Resources:
                   - 'wafv2:GetIPSet'
                   - 'wafv2:UpdateIPSet'
                 Resource:
-                  - !Sub 'arn:${AWS::Partition}:wafv2:${AWS::Region}:${AWS::AccountId}:*/ipset/aws-ip-ranges-*-ipv4/*'
-                  - !Sub 'arn:${AWS::Partition}:wafv2:${AWS::Region}:${AWS::AccountId}:*/ipset/aws-ip-ranges-*-ipv6/*'
+                  - !Sub 'arn:${AWS::Partition}:wafv2:${AWS::Region}:${AWS::AccountId}:*/ipset/cloudflare-ip-ranges-*-ipv4/*'
+                  - !Sub 'arn:${AWS::Partition}:wafv2:${AWS::Region}:${AWS::AccountId}:*/ipset/cloudflare-ip-ranges-*-ipv6/*'
                 Condition:
                   StringLike:
                     'aws:ResourceTag/Name':
-                      - 'aws-ip-ranges-*-ipv4'
-                      - 'aws-ip-ranges-*-ipv6'
+                      - 'cloudflare-ip-ranges-*-ipv4'
+                      - 'cloudflare-ip-ranges-*-ipv6'
                   StringEquals:
-                    'aws:ResourceTag/ManagedBy': 'update-aws-ip-ranges'
+                    'aws:ResourceTag/ManagedBy': 'update-cloudflare-ip-ranges'
 
 
         - PolicyName: 'EC2Permissions'
@@ -156,11 +156,11 @@ Resources:
                 Condition:
                   StringEquals:
                     'ec2:Region': !Ref AWS::Region
-                    'aws:ResourceTag/ManagedBy': 'update-aws-ip-ranges'
+                    'aws:ResourceTag/ManagedBy': 'update-cloudflare-ip-ranges'
                   StringLike:
                     'aws:ResourceTag/Name':
-                      - 'aws-ip-ranges-*-ipv4'
-                      - 'aws-ip-ranges-*-ipv6'
+                      - 'cloudflare-ip-ranges-*-ipv4'
+                      - 'cloudflare-ip-ranges-*-ipv6'
 
               - Effect: 'Allow'
                 Action:
@@ -169,12 +169,12 @@ Resources:
                 Condition:
                   StringEquals:
                     'ec2:Region': !Ref AWS::Region
-                    'aws:RequestTag/ManagedBy': 'update-aws-ip-ranges'
+                    'aws:RequestTag/ManagedBy': 'update-cloudflare-ip-ranges'
                     'aws:RequestTag/UpdatedAt': 'Not yet'
                   StringLike:
                     'aws:RequestTag/Name':
-                      - 'aws-ip-ranges-*-ipv4'
-                      - 'aws-ip-ranges-*-ipv6'
+                      - 'cloudflare-ip-ranges-*-ipv4'
+                      - 'cloudflare-ip-ranges-*-ipv6'
                   'ForAllValues:StringEquals':
                     'aws:TagKeys':
                       - 'Name'

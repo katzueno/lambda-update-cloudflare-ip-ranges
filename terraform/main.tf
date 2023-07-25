@@ -86,12 +86,12 @@ resource "aws_iam_role" "update_ip_ranges" {
             "Condition" : {
               "StringEquals" : {
                 "aws:RequestTag/UpdatedAt" : "Not yet",
-                "aws:RequestTag/ManagedBy" : "update-aws-ip-ranges"
+                "aws:RequestTag/ManagedBy" : "update-cloudflare-ip-ranges"
               },
               "StringLike" : {
                 "aws:RequestTag/Name" : [
-                  "aws-ip-ranges-*-ipv4",
-                  "aws-ip-ranges-*-ipv6"
+                  "cloudflare-ip-ranges-*-ipv4",
+                  "cloudflare-ip-ranges-*-ipv6"
                 ]
               },
               "ForAllValues:StringEquals" : {
@@ -110,17 +110,17 @@ resource "aws_iam_role" "update_ip_ranges" {
               "wafv2:TagResource"
             ],
             "Resource" : [
-              "arn:${data.aws_partition.current.partition}:wafv2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/ipset/aws-ip-ranges-*-ipv4/*",
-              "arn:${data.aws_partition.current.partition}:wafv2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/ipset/aws-ip-ranges-*-ipv6/*"
+              "arn:${data.aws_partition.current.partition}:wafv2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/ipset/cloudflare-ip-ranges-*-ipv4/*",
+              "arn:${data.aws_partition.current.partition}:wafv2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/ipset/cloudflare-ip-ranges-*-ipv6/*"
             ],
             "Condition" : {
               "StringEquals" : {
-                "aws:ResourceTag/ManagedBy" : "update-aws-ip-ranges"
+                "aws:ResourceTag/ManagedBy" : "update-cloudflare-ip-ranges"
               },
               "StringLike" : {
                 "aws:ResourceTag/Name" : [
-                  "aws-ip-ranges-*-ipv4",
-                  "aws-ip-ranges-*-ipv6"
+                  "cloudflare-ip-ranges-*-ipv4",
+                  "cloudflare-ip-ranges-*-ipv6"
                 ]
               },
               "ForAllValues:StringEquals" : {
@@ -138,17 +138,17 @@ resource "aws_iam_role" "update_ip_ranges" {
               "wafv2:UpdateIPSet"
             ],
             "Resource" : [
-              "arn:${data.aws_partition.current.partition}:wafv2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/ipset/aws-ip-ranges-*-ipv4/*",
-              "arn:${data.aws_partition.current.partition}:wafv2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/ipset/aws-ip-ranges-*-ipv6/*"
+              "arn:${data.aws_partition.current.partition}:wafv2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/ipset/cloudflare-ip-ranges-*-ipv4/*",
+              "arn:${data.aws_partition.current.partition}:wafv2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/ipset/cloudflare-ip-ranges-*-ipv6/*"
             ],
             "Condition" : {
               "StringEquals" : {
-                "aws:ResourceTag/ManagedBy" : "update-aws-ip-ranges"
+                "aws:ResourceTag/ManagedBy" : "update-cloudflare-ip-ranges"
               },
               "StringLike" : {
                 "aws:ResourceTag/Name" : [
-                  "aws-ip-ranges-*-ipv4",
-                  "aws-ip-ranges-*-ipv6"
+                  "cloudflare-ip-ranges-*-ipv4",
+                  "cloudflare-ip-ranges-*-ipv6"
                 ]
               }
             }
@@ -188,13 +188,13 @@ resource "aws_iam_role" "update_ip_ranges" {
             "Resource" : "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:prefix-list/*",
             "Condition" : {
               "StringEquals" : {
-                "aws:ResourceTag/ManagedBy" : "update-aws-ip-ranges",
+                "aws:ResourceTag/ManagedBy" : "update-cloudflare-ip-ranges",
                 "ec2:Region" : "${data.aws_region.current.name}"
               },
               "StringLike" : {
                 "aws:ResourceTag/Name" : [
-                  "aws-ip-ranges-*-ipv4",
-                  "aws-ip-ranges-*-ipv6"
+                  "cloudflare-ip-ranges-*-ipv4",
+                  "cloudflare-ip-ranges-*-ipv6"
                 ]
               }
             }
@@ -208,13 +208,13 @@ resource "aws_iam_role" "update_ip_ranges" {
             "Condition" : {
               "StringEquals" : {
                 "aws:RequestTag/UpdatedAt" : "Not yet",
-                "aws:RequestTag/ManagedBy" : "update-aws-ip-ranges",
+                "aws:RequestTag/ManagedBy" : "update-cloudflare-ip-ranges",
                 "ec2:Region" : "${data.aws_region.current.name}"
               },
               "StringLike" : {
                 "aws:RequestTag/Name" : [
-                  "aws-ip-ranges-*-ipv4",
-                  "aws-ip-ranges-*-ipv6"
+                  "cloudflare-ip-ranges-*-ipv4",
+                  "cloudflare-ip-ranges-*-ipv6"
                 ]
               },
               "ForAllValues:StringEquals" : {
@@ -250,11 +250,11 @@ resource "aws_iam_role" "update_ip_ranges" {
 data "archive_file" "lambda_source" {
   type = "zip"
   #source_dir  = var.src_path
-  output_path = "/tmp/update_aws_ip_ranges.zip"
+  output_path = "/tmp/update_cloudflare_ip_ranges.zip"
 
   source {
-    filename = "update_aws_ip_ranges.py"
-    content  = file("../lambda/update_aws_ip_ranges.py")
+    filename = "update_cloudflare_ip_ranges.py"
+    content  = file("../lambda/update_cloudflare_ip_ranges.py")
   }
 
   source {
@@ -274,7 +274,7 @@ resource "aws_lambda_function" "update_ip_ranges" {
   function_name                  = "UpdateIPRanges"
   description                    = "This Lambda function, invoked by an incoming SNS message, updates the IPv4 and IPv6 ranges with the addresses from the specified services"
   role                           = aws_iam_role.update_ip_ranges.arn
-  handler                        = "update_aws_ip_ranges.lambda_handler"
+  handler                        = "update_cloudflare_ip_ranges.lambda_handler"
   runtime                        = "python3.10"
   timeout                        = 300
   reserved_concurrent_executions = 2

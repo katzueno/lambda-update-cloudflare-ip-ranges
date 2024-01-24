@@ -82,6 +82,7 @@ ToDo: changing it more strict only to allow modifying to the specific prefix (PR
 - Create an empty managed VPC prefix list in your desired region
     - Predfix list name: e.g..) `cloudflare-ips`
     - Max entries: As of July 2023, Cloudflare has 15 IP range items. Set to 100 if possible, otherwise set it 30.
+    - Note: Security groups by default have a limit of 60 rules for inbound and outbound. If you set the prefix max entries to above 60 you will need to raise your quota or you will encounter an error when creating a security group using the prefix list. 
 - Copy and memo the prefix list ID (e.g., `pl-XXXXXXXXXXXXXXXXXXX`)
 
 ### 3. Create an lambda function
